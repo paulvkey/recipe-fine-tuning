@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "description": "只清理缺失平台上下文且位于文本末尾、独立成行或明确为网址的内容。",
+  "rules": [
+    {
+      "id": "standalone_post_number",
+      "enabled": true,
+      "fields": ["description"],
+      "regex": true,
+      "pattern": "(?m)^\\s*#\\d+\\s*$",
+      "replacement": "",
+      "reason": "删除原平台作品编号"
+    },
+    {
+      "id": "trailing_media_reference",
+      "enabled": true,
+      "fields": ["description", "recipeIngredient", "recipeInstructions"],
+      "regex": true,
+      "pattern": "[，,。；;\\s]*(?:如图所示|如图|详情见视频|点击视频查看|看图|见图)[👆👉👇🏻🏼🏽🏾🏿\\s]*(?:哈+)?[。.!！]?\\s*$",
+      "replacement": "",
+      "reason": "删除训练数据中无法访问的图片或视频引用"
+    },
+    {
+      "id": "standalone_media_step",
+      "enabled": true,
+      "fields": ["recipeInstructions"],
+      "regex": true,
+      "pattern": "^\\s*(?:(?:请)?(?:看|见|参考)(?:上|下)?(?:图|图片|视频)(?:一|二|三|\\d+)?|如图(?:所示)?|按照图片操作|按图操作|图片整理|传图专用|见上文|见文字|详细步骤和用料看下面|图片都有详细说法(?:啦)?|步骤忘记(?:拍|写)(?:了)?(?:下次补上)?|忘记(?:拍|写)步骤(?:了)?|(?:直接来个)?成品图(?:吧)?|过程没有录制)[👆👉👇🏻🏼🏽🏾🏿\\s]*(?:哈+)?[。.!！]?\\s*$",
+      "replacement": "",
+      "reason": "删除完全依赖缺失图片的独立步骤"
+    },
+    {
+      "id": "inline_media_deictic",
+      "enabled": true,
+      "fields": ["description", "recipeIngredient", "recipeInstructions"],
+      "regex": true,
+      "pattern": "[（(]?(?:如(?:下)?图|(?:上|下)图)(?:所?示)?(?:一|二|三|\\d+)?[）)]?",
+      "replacement": "",
+      "reason": "删除缺少图片上下文的指示词，同时保留可独立理解的操作文字"
+    },
+    {
+      "id": "ingredient_media_deictic",
+      "enabled": true,
+      "fields": ["recipeIngredient"],
+      "regex": true,
+      "pattern": "[（(]?(?:看|见)(?:图片|图)(?:一|二|三|\\d+)?[）)]?",
+      "replacement": "",
+      "reason": "删除食材字段中无法提供用量信息的看图或见图指示词"
+    },
+    {
+      "id": "external_url",
+      "enabled": true,
+      "fields": ["description", "recipeIngredient", "recipeInstructions"],
+      "regex": true,
+      "pattern": "(?i)https?://[^\\s，。；;]+|www\\.[^\\s，。；;]+",
+      "replacement": "",
+      "reason": "删除训练时无法访问的外部链接"
+    },
+    {
+      "id": "contact_promotion_line",
+      "enabled": true,
+      "fields": ["description"],
+      "regex": true,
+      "pattern": "(?im)^.*(?:微信(?:公众号)?|公众号|个人微信|新浪微博|微博|vx|v信)\\s*[:：]?\\s*[@A-Za-z0-9_-]{5,}.*$",
+      "replacement": "",
+      "reason": "删除描述中包含联系方式的推广行"
+    },
+    {
+      "id": "promotion_line",
+      "enabled": true,
+      "fields": ["description"],
+      "regex": true,
+      "pattern": "(?im)^.*(?:联系我|加我|私信我|关注公众号|关注我|不做免费的?咨询).*$",
+      "replacement": "",
+      "reason": "删除描述中的联系、关注和付费咨询推广行"
+    },
+    {
+      "id": "contact_identifier_in_step",
+      "enabled": true,
+      "fields": ["recipeInstructions"],
+      "regex": true,
+      "pattern": "(?i)(?:微信(?:公众号)?|公众号|个人微信|新浪微博|微博|vx|v信)\\s*[:：]?\\s*[@A-Za-z0-9_-]{5,}",
+      "replacement": "",
+      "reason": "删除制作步骤中的联系方式账号"
+    }
+  ]
+}

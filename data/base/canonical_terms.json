@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "description": "用于在采样语料中发现易混字变体的标准烹饪词。",
+  "terms": [
+    {"term": "腌制", "fields": ["description", "recipeInstructions"]},
+    {"term": "浸泡", "fields": ["description", "recipeInstructions"]},
+    {"term": "焯水", "fields": ["recipeInstructions"]},
+    {"term": "没过", "fields": ["recipeInstructions"]},
+    {"term": "蚝油", "fields": ["recipeIngredient"]},
+    {"term": "鱼块", "fields": ["recipeIngredient", "recipeInstructions"]},
+    {"term": "切块", "fields": ["recipeInstructions"]},
+    {"term": "浮沫", "fields": ["recipeInstructions"]},
+    {"term": "预热", "fields": ["recipeInstructions"]},
+    {"term": "烤箱", "fields": ["recipeIngredient", "recipeInstructions"]},
+    {"term": "搅拌", "fields": ["recipeInstructions"]},
+    {"term": "沥干", "fields": ["recipeInstructions"]}
+  ]
+}

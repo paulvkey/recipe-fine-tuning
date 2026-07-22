@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "description": "人工确认的基础纠错规则；自动发现结果写入构建目录，不直接修改本文件。",
+  "rules": [
+    {
+      "id": "typo_mo_guo",
+      "enabled": true,
+      "fields": ["description", "recipeInstructions"],
+      "pattern": "漠过",
+      "replacement": "没过",
+      "reason": "烹饪语境中表示液面覆盖食材"
+    },
+    {
+      "id": "typo_mo_guo_foam",
+      "enabled": true,
+      "fields": ["description", "recipeInstructions"],
+      "pattern": "沫过",
+      "replacement": "没过",
+      "reason": "烹饪语境中表示液面覆盖食材"
+    },
+    {
+      "id": "typo_yan_zhi",
+      "enabled": true,
+      "fields": ["description", "recipeInstructions"],
+      "pattern": "淹制",
+      "replacement": "腌制",
+      "reason": "固定烹饪动词错字"
+    },
+    {
+      "id": "typo_jin_pao_qin",
+      "enabled": true,
+      "fields": ["description", "recipeInstructions"],
+      "pattern": "侵泡",
+      "replacement": "浸泡",
+      "reason": "固定烹饪动词错字"
+    },
+    {
+      "id": "typo_jin_pao_shen",
+      "enabled": true,
+      "fields": ["description", "recipeInstructions"],
+      "pattern": "寖泡",
+      "replacement": "浸泡",
+      "reason": "固定烹饪动词错字"
+    },
+    {
+      "id": "typo_chao_shui",
+      "enabled": true,
+      "fields": ["recipeInstructions"],
+      "pattern": "抄水",
+      "replacement": "焯水",
+      "reason": "固定烹饪工序错字"
+    }
+  ]
+}

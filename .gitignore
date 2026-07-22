@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+.DS_Store
+
+# Large source corpora and generated datasets
+recipe_corpus*.json
+recipe_corpus*.jsonl
+recipe_train*.jsonl
+preview*.jsonl
+pipeline_output/
+pipeline_preview/
+recipe_audit*.json
+recipe_review*.jsonl
+recipe_rejected*.jsonl
+recipe_clean_report*.json
+clean_report*.json
