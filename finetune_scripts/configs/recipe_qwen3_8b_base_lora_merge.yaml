@@ -2,7 +2,7 @@
 
 ### model
 model_name_or_path: Qwen/Qwen3-8B-Base
-adapter_name_or_path: outputs/qwen3-8b-base/recipe-lora-sft/checkpoint-1000
+adapter_name_or_path: outputs/qwen3-8b-base/recipe-lora-sft/checkpoint-1400
 template: qwen3_nothink
 trust_remote_code: true
 

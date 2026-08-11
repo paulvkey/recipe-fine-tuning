@@ -15,6 +15,7 @@ finetune_scripts/
 │   ├── eval_holdout_report.json
 │   └── recipe_eval_holdout.jsonl
 ├── .gitignore
+├── COMMANDS.md
 ├── download_model.sh
 ├── evaluate_checkpoints.sh
 ├── export_best_model.sh
@@ -27,6 +28,8 @@ finetune_scripts/
 
 `train.sh` 启动时会在 `data/` 中创建指向真实 JSONL 的符号链接，不复制训练数据，
 也不修改 `$HOME/LlamaFactory/data/dataset_info.json`。
+
+只需要按顺序复制命令时，直接查看 [`COMMANDS.md`](COMMANDS.md)。
 
 ## 最终训练参数
 
@@ -53,11 +56,11 @@ finetune_scripts/
 | 计算精度 | BF16 |
 | 基础学习率 | `1e-5` |
 | 学习率调度 | cosine |
-| Logging steps | 10 |
-| Save steps | 1000 |
+| Logging steps | 100 |
+| Save steps | 1400（约 1/4 epoch） |
 | Warmup steps | 1000 |
 | Checkpoint 保留数量 | 不限制，保留全部 |
-| 评估频率 | 每个 epoch 一次 |
+| 评估频率 | 1400 steps（约 1/4 epoch，与保存对齐） |
 | 梯度检查点 | 默认关闭，可在 OOM 时启用 |
 | Prompt loss | 关闭，只对 output 计算损失 |
 | Packing | 关闭 |
@@ -97,17 +100,17 @@ LlamaFactory 参数文档的常用设置。训练最多读取 100000 条样本�
 只有 0.15% 的记录超过 2048 个字符。字符数不完全等于 token 数，但说明 2048 的截断
 长度总体合理。下载模型后如需精确判断，可以用 Qwen3 tokenizer 对全部数据再次统计。
 
-验证集比例 0.1 会得到约 9 万条训练数据和 1 万条验证数据。为了避免反复评估 1 万条
-数据拖慢训练，配置使用每个 epoch 评估一次；checkpoint 则每 1000 个优化步骤保存一次，
-不设置 `save_total_limit`，因此不会自动删除中间 checkpoint。
+验证集比例 0.1 会得到约 9 万条训练数据和 1 万条验证数据。配置每 1400 个优化步骤
+评估并保存一次，约等于每个 epoch 的 1/4；评估点和可供最终生成式评测的 checkpoint
+一一对应。不设置 `save_total_limit`，因此不会自动删除中间 checkpoint。
 
 按 9 万条训练数据、单卡有效 batch size 16 和 3 个 epoch 估算，总优化步数约为
-16875：`logging_steps: 10` 大约产生 1688 次训练日志；`save_steps: 1000` 大约产生
-16 次阶段性 checkpoint，并且全部保留；`warmup_steps: 1000` 约占总训练步数的 5.9%。这里使用显式
+16875：`logging_steps: 100` 大约产生 169 次训练日志；`save_steps: 1400` 大约产生
+12 次阶段性 checkpoint，并且全部保留；`warmup_steps: 1000` 约占总训练步数的 5.9%。这里使用显式
 `warmup_steps`，不再同时配置 `warmup_ratio`，避免两个 warmup 参数产生理解歧义。
 
-当前没有启用 `load_best_model_at_end`，因为验证频率是每个 epoch 一次，而 checkpoint
-每 1000 步保存一次。训练结束后应使用固定评测集或实际问答样例比较中间 checkpoint，
+当前没有启用 `load_best_model_at_end`，所有评估点都会保存 checkpoint。训练结束后应使用
+固定评测集或实际问答样例比较中间 checkpoint，
 确定最终版本后再人工删除效果较差的节点。所有 checkpoint 都包含继续训练需要的状态，
 可以直接通过 `RESUME_FROM_CHECKPOINT` 恢复。
 
@@ -324,7 +327,7 @@ QLoRA，因为当前 H100 90GB 和最终方案都适合 BF16 LoRA。
 ## 最终评估方案
 
 训练时的 10% 验证集用于观察 `eval_loss`，最终挑选 checkpoint 使用单独固定留出集。
-这样可以保留并公平比较 `checkpoint-1000` 到最后一个 checkpoint，也能与未微调基础模型
+这样可以保留并公平比较 `checkpoint-1400` 到最后一个 checkpoint，也能与未微调基础模型
 作同条件对照。
 
 当前已从 `pipeline_output/recipe_train_clean.jsonl` 生成 1000 条留出数据：
@@ -410,7 +413,7 @@ LoRA 加载路径；如果是通过 `USE_DORA=1` 训练的 checkpoint，由于 v
 3. 只保留预测与指标，立即删除该次约 16.4GB 的临时合并模型；
 4. 再处理下一个 checkpoint。
 
-这样不会为约 16 个 checkpoint 长期占用约 260GB 额外空间，但临时合并目录所在磁盘仍需
+这样不会为约 12 个 checkpoint 长期占用约 197GB 额外空间，但临时合并目录所在磁盘仍需
 至少 20GiB 可用空间。中断时脚本也只会清理它自己通过 `mktemp` 创建的目录。默认
 `MERGE_DEVICE=auto`，在 H100 上通常会使用 GPU 加快合并；也可以改为 CPU：
 

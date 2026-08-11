@@ -356,9 +356,10 @@ python3 -m recipe_pipeline recipe_corpus.json \
 
 ## 13. 使用 LlamaFactory 微调
 
-服务器微调配置和命令已单独保存在 [`finetune_scripts/`](finetune_scripts/README.md)。
+服务器微调配置和完整命令已单独保存在
+[`finetune_scripts/COMMANDS.md`](finetune_scripts/COMMANDS.md)。
 
-使用 Qwen3-8B-Base 执行非思考模式 LoRA + LoRA+ + DoRA 微调：
+使用 Qwen3-8B-Base 执行非思考模式 LoRA + LoRA+ 微调：
 
 ```bash
 conda activate llamafactory
