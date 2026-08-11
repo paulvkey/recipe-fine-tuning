@@ -353,3 +353,16 @@ python3 -m recipe_pipeline recipe_corpus.json \
   --sample-size 2000 \
   --target-count 100
 ```
+
+## 13. 使用 LlamaFactory 微调
+
+服务器微调配置和命令已单独保存在 [`finetune_scripts/`](finetune_scripts/README.md)。
+
+使用 Qwen3-8B-Base 执行非思考模式 LoRA + LoRA+ + DoRA 微调：
+
+```bash
+conda activate llamafactory
+bash finetune_scripts/download_model.sh
+DRY_RUN=1 bash finetune_scripts/train.sh
+bash finetune_scripts/train.sh
+```

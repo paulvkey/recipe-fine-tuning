@@ -1,0 +1,20 @@
+{
+  "recipe_sft_100k": {
+    "file_name": "recipe_train_sample.jsonl",
+    "formatting": "alpaca",
+    "columns": {
+      "prompt": "instruction",
+      "query": "input",
+      "response": "output"
+    }
+  },
+  "recipe_eval_holdout": {
+    "file_name": "recipe_eval_holdout.jsonl",
+    "formatting": "alpaca",
+    "columns": {
+      "prompt": "instruction",
+      "query": "input",
+      "response": "output"
+    }
+  }
+}

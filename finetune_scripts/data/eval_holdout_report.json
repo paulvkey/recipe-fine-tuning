@@ -1,0 +1,17 @@
+{
+  "source_file": "/Users/shirsen/Project/recipe-fine-tuning/pipeline_output/recipe_train_clean.jsonl",
+  "train_file": "/Users/shirsen/Project/recipe-fine-tuning/training_sample/recipe_train_sample_100000.jsonl",
+  "output_file": "/Users/shirsen/Project/recipe-fine-tuning/finetune_scripts/data/recipe_eval_holdout.jsonl",
+  "seed": 20260811,
+  "requested_count": 1000,
+  "written_count": 1000,
+  "train_rows": 100000,
+  "train_unique_records": 100000,
+  "source_rows": 1476060,
+  "malformed_or_invalid_rows": 0,
+  "excluded_train_overlap_rows": 100000,
+  "excluded_duplicate_source_rows": 0,
+  "eligible_unique_rows": 1376060,
+  "output_sha256": "6c066305364739079ffdf2b248359002cc8e88329245e5417fa89121c68bb29d",
+  "disjoint_rule": "BLAKE2b-128 over normalized instruction/input/output"
+}

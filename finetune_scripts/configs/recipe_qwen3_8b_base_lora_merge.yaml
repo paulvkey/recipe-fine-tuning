@@ -1,0 +1,13 @@
+### Note: DoRA/LoRA 合并必须使用未量化的基础模型。
+
+### model
+model_name_or_path: Qwen/Qwen3-8B-Base
+adapter_name_or_path: outputs/qwen3-8b-base/recipe-lora-sft/checkpoint-1000
+template: qwen3_nothink
+trust_remote_code: true
+
+### export
+export_dir: outputs/qwen3-8b-base/recipe-merged
+export_size: 5
+export_device: auto
+export_legacy_format: false

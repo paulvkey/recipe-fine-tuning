@@ -1,0 +1,14 @@
+# Runtime dataset link created by train.sh
+data/recipe_train_sample.jsonl
+
+# Training artifacts
+outputs/
+evaluation/
+exported_models/
+cache/
+*.log
+__pycache__/
+*.py[cod]
+
+# Model files are stored outside the project by default.
+models/
