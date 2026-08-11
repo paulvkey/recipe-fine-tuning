@@ -242,6 +242,26 @@ DRY_RUN=1 bash finetune_scripts/train.sh
 bash finetune_scripts/train.sh
 ```
 
+正式训练默认通过 `nohup` 自动转入后台，服务器存在 `setsid` 时还会脱离当前会话；命令
+返回后会显示 PID 和时间戳日志路径，可以直接关闭终端，不需要手工追加 `&`。查看状态：
+
+```bash
+RECIPE_TRAIN_PID=$(cat finetune_scripts/logs/train.pid)
+ps -p "$RECIPE_TRAIN_PID" -o pid,etime,stat,cmd
+
+RECIPE_TRAIN_LOG=$(ls -1t finetune_scripts/logs/train_*.log | head -n 1)
+tail -f "$RECIPE_TRAIN_LOG"
+```
+
+`DRY_RUN=1` 始终在前台显示检查结果。需要在前台调试正式训练时使用：
+
+```bash
+TRAIN_RUN_MODE=foreground bash finetune_scripts/train.sh
+```
+
+普通 SSH 服务器可使用上述后台模式；Slurm、Kubernetes 或启用了登录退出进程清理策略的
+服务器，应使用对应平台的作业调度命令。
+
 默认 checkpoint 输出目录：
 
 ```text

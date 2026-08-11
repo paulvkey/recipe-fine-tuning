@@ -367,3 +367,6 @@ bash finetune_scripts/download_model.sh
 DRY_RUN=1 bash finetune_scripts/train.sh
 bash finetune_scripts/train.sh
 ```
+
+正式训练会自动转入后台并显示 PID 和日志路径，关闭终端不会中断；状态查看、断点恢复和
+最终评估命令见上面的微调命令手册。

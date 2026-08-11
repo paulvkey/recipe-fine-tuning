@@ -15,6 +15,11 @@ ATTENTION_BACKEND=${ATTENTION_BACKEND:-auto}
 USE_DORA=${USE_DORA:-0}
 GRADIENT_CHECKPOINTING=${GRADIENT_CHECKPOINTING:-0}
 DRY_RUN=${DRY_RUN:-0}
+TRAIN_RUN_MODE=${TRAIN_RUN_MODE:-background}
+TRAIN_BACKGROUND_WORKER=${TRAIN_BACKGROUND_WORKER:-0}
+TRAIN_LOG_DIR=${TRAIN_LOG_DIR:-"$SCRIPT_DIR/logs"}
+TRAIN_LOG_FILE=${TRAIN_LOG_FILE:-}
+TRAIN_PID_FILE=${TRAIN_PID_FILE:-"$TRAIN_LOG_DIR/train.pid"}
 
 DATA_DIR="$SCRIPT_DIR/data"
 DATA_LINK="$DATA_DIR/recipe_train_sample.jsonl"
@@ -31,6 +36,11 @@ normalize_bool() {
     *) die "$2 只支持 0/1、true/false 或 yes/no" ;;
   esac
 }
+
+case "$TRAIN_RUN_MODE" in
+  background|foreground) ;;
+  *) die "TRAIN_RUN_MODE 只支持 background 或 foreground" ;;
+esac
 
 CONFIG_FILE="$SCRIPT_DIR/configs/recipe_qwen3_8b_base_lora_sft.yaml"
 
@@ -147,9 +157,57 @@ if [[ "$DRY_RUN" == 1 ]]; then
   exit 0
 fi
 
+# 正式训练默认脱离当前终端；后台 worker 本身保持前台执行。
+if [[ "$TRAIN_RUN_MODE" == background && "$TRAIN_BACKGROUND_WORKER" != 1 ]]; then
+  mkdir -p -- "$TRAIN_LOG_DIR"
+  TRAIN_LOG_DIR=$(cd -- "$TRAIN_LOG_DIR" && pwd)
+  if [[ -z "$TRAIN_LOG_FILE" ]]; then
+    TRAIN_LOG_FILE="$TRAIN_LOG_DIR/train_$(date '+%Y%m%d_%H%M%S').log"
+  elif [[ "$TRAIN_LOG_FILE" != /* ]]; then
+    TRAIN_LOG_FILE="$PWD/$TRAIN_LOG_FILE"
+  fi
+  if [[ "$TRAIN_PID_FILE" != /* ]]; then
+    TRAIN_PID_FILE="$PWD/$TRAIN_PID_FILE"
+  fi
+  mkdir -p -- "$(dirname -- "$TRAIN_LOG_FILE")" "$(dirname -- "$TRAIN_PID_FILE")"
+
+  if [[ -s "$TRAIN_PID_FILE" ]]; then
+    IFS= read -r existing_pid < "$TRAIN_PID_FILE" || true
+    if [[ "$existing_pid" =~ ^[1-9][0-9]*$ ]] && kill -0 "$existing_pid" 2>/dev/null; then
+      die "检测到仍在运行的训练进程 PID=$existing_pid；PID 文件：$TRAIN_PID_FILE"
+    fi
+  fi
+
+  declare -a worker_command=(
+    env
+    TRAIN_BACKGROUND_WORKER=1
+    TRAIN_RUN_MODE=foreground
+    TRAIN_LOG_DIR="$TRAIN_LOG_DIR"
+    TRAIN_LOG_FILE="$TRAIN_LOG_FILE"
+    TRAIN_PID_FILE="$TRAIN_PID_FILE"
+    bash "$SCRIPT_DIR/train.sh"
+  )
+  if command -v setsid >/dev/null 2>&1; then
+    worker_command=(setsid "${worker_command[@]}")
+  fi
+
+  nohup "${worker_command[@]}" </dev/null >>"$TRAIN_LOG_FILE" 2>&1 &
+  background_pid=$!
+  printf '%s\n' "$background_pid" > "$TRAIN_PID_FILE"
+
+  printf '\n训练已在后台启动。\n'
+  printf 'PID：%s\n' "$background_pid"
+  printf 'PID 文件：%s\n' "$TRAIN_PID_FILE"
+  printf '日志文件：%s\n' "$TRAIN_LOG_FILE"
+  printf '查看日志：tail -f %q\n' "$TRAIN_LOG_FILE"
+  printf '查看进程：ps -p %q -o pid,etime,stat,cmd\n\n' "$background_pid"
+  exit 0
+fi
+
 cd -- "$LLAMAFACTORY_DIR"
 export CUDA_VISIBLE_DEVICES="$GPU_IDS"
 export PYTHONNOUSERSITE=1
+export PYTHONUNBUFFERED=1
 export TOKENIZERS_PARALLELISM=false
 export PYTORCH_CUDA_ALLOC_CONF="${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:True}"
 
@@ -160,4 +218,4 @@ if command -v nvidia-smi >/dev/null 2>&1; then
     --format=csv,noheader,nounits || true
 fi
 
-"${command[@]}"
+exec "${command[@]}"

@@ -30,6 +30,7 @@ LlamaFactory：$HOME/LlamaFactory
 基础模型：$HOME/models/Qwen3-8B-Base
 训练数据：training_sample/recipe_train_sample_100000.jsonl
 训练输出：finetune_scripts/outputs/qwen3-8b-base/recipe-lora-sft/
+后台日志：finetune_scripts/logs/
 评估输出：finetune_scripts/evaluation/qwen3-8b-base-recipe/
 最终模型：finetune_scripts/exported_models/qwen3-8b-base-recipe/
 ```
@@ -109,6 +110,20 @@ DRY_RUN=1 bash finetune_scripts/train.sh
 bash finetune_scripts/train.sh
 ```
 
+正式训练默认自动转入后台，命令会立即返回并显示 PID、PID 文件和日志文件。脚本使用
+`nohup`，系统提供 `setsid` 时还会创建独立会话，因此可以直接关闭 SSH 终端，不需要在
+命令末尾额外添加 `&`。
+
+该方式适用于普通 SSH 服务器。如果服务器由 Slurm、Kubernetes 等调度系统管理，或者
+管理员启用了退出登录后清理用户进程的策略，应改用平台提供的作业提交命令；Shell 脚本
+无法绕过服务器级进程清理策略。
+
+需要在前台调试时：
+
+```bash
+TRAIN_RUN_MODE=foreground bash finetune_scripts/train.sh
+```
+
 默认训练参数：
 
 ```text
@@ -171,6 +186,25 @@ bash finetune_scripts/train.sh
 
 ## 5. 查看训练状态
 
+查看后台训练 PID 和进程状态：
+
+```bash
+cat finetune_scripts/logs/train.pid
+
+RECIPE_TRAIN_PID=$(cat finetune_scripts/logs/train.pid)
+ps -p "$RECIPE_TRAIN_PID" -o pid,etime,stat,cmd
+```
+
+查看最近一次后台训练日志：
+
+```bash
+RECIPE_TRAIN_LOG=$(ls -1t finetune_scripts/logs/train_*.log | head -n 1)
+tail -f "$RECIPE_TRAIN_LOG"
+```
+
+日志中的配置检查通过并开始输出训练 loss 后，即可安全关闭当前终端。PID 文件在训练
+结束后可能继续保留；下次启动会检查对应进程是否仍存在，并覆盖已经失效的 PID。
+
 查看 GPU 使用情况：
 
 ```bash
@@ -189,6 +223,15 @@ find finetune_scripts/outputs/qwen3-8b-base/recipe-lora-sft \
 ```bash
 tail -f finetune_scripts/outputs/qwen3-8b-base/recipe-lora-sft/trainer_log.jsonl
 ```
+
+需要主动停止训练时，向后台主进程发送 TERM：
+
+```bash
+RECIPE_TRAIN_PID=$(cat finetune_scripts/logs/train.pid)
+kill "$RECIPE_TRAIN_PID"
+```
+
+停止时当前尚未到达保存点的进度可能丢失，之后应从最近的完整 checkpoint 恢复。
 
 ## 6. 从 checkpoint 继续训练
 
@@ -375,6 +418,10 @@ bash finetune_scripts/export_best_model.sh
 | `GRADIENT_CHECKPOINTING` | `0`                                                | 是否启用梯度检查点             |
 | `USE_DORA`               | `0`                                                | 是否启用实验性 DoRA            |
 | `RESUME_FROM_CHECKPOINT` | 空                                                 | 断点恢复目录                   |
+| `TRAIN_RUN_MODE`         | `background`                                       | 后台运行或前台调试             |
+| `TRAIN_LOG_DIR`          | `finetune_scripts/logs`                            | 后台训练日志目录               |
+| `TRAIN_LOG_FILE`         | 自动生成时间戳文件名                               | 自定义本次后台日志文件         |
+| `TRAIN_PID_FILE`         | `finetune_scripts/logs/train.pid`                  | 后台训练 PID 文件              |
 | `CHECKPOINT_ROOT`        | 默认训练输出目录                                   | 批量评估的 checkpoint 根目录   |
 | `CHECKPOINT_DIR`         | 空                                                 | 只评估一个 checkpoint          |
 | `RESULT_ROOT`            | `finetune_scripts/evaluation/...`                  | 评估结果目录                   |

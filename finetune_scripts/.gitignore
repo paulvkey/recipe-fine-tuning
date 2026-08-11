@@ -5,6 +5,7 @@ data/recipe_train_sample.jsonl
 outputs/
 evaluation/
 exported_models/
+logs/
 cache/
 *.log
 __pycache__/
