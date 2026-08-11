@@ -9,6 +9,8 @@ recipe_train*.jsonl
 preview*.jsonl
 pipeline_output/
 pipeline_preview/
+training_sample_output/
+training_sample_*/
 recipe_audit*.json
 recipe_review*.jsonl
 recipe_rejected*.jsonl

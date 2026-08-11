@@ -1,0 +1,16 @@
+{
+  "pipeline_version": "1.3.0",
+  "source": "/Users/shirsen/Project/recipe-fine-tuning/pipeline_output/recipe_train_clean.jsonl",
+  "output": "/Users/shirsen/Project/recipe-fine-tuning/training_sample/recipe_train_sample_100000.jsonl",
+  "source_total_lines": 1476060,
+  "source_nonempty_records": 1476060,
+  "source_blank_lines": 0,
+  "requested_sample_size": 100000,
+  "selected_records": 100000,
+  "seed": 20260811,
+  "algorithm": "two_pass_sequential_uniform_selection",
+  "memory_behavior": "constant_memory",
+  "output_order": "source_order_of_randomly_selected_records",
+  "selected_records_validation": "instruction/input/output fields are strings",
+  "content_sha256": "f692f0bcb17e1af5ceb13c3e0b6b4c87c4e8668c898bd48cb09542442600999f"
+}

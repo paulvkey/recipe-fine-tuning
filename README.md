@@ -1,5 +1,7 @@
 # recipe-fine-tuning
 
+完整命令参考见 [`COMMANDS.md`](COMMANDS.md)。
+
 ## 一键执行
 
 所有脚本只使用 Python 3 标准库，不需要安装第三方包。原始 JSONL 会逐行处理，
@@ -79,6 +81,32 @@ data/base/                      # 人工维护的小型基础配置
 
 这种方式可以自动覆盖“绰水→焯水”“耗油→蚝油”等高置信度变体，同时避免
 开放式拼写模型把地方菜名、品牌名或正常近义词改错。
+
+## 从清洗结果单独抽取训练样本
+
+清洗完成后，可直接从 `pipeline_output/recipe_train_clean.jsonl` 中随机抽取 10 万条，
+写入独立目录：
+
+```bash
+python3 -m recipe_pipeline.sample \
+  pipeline_output/recipe_train_clean.jsonl \
+  --sample-size 100000 \
+  --output-dir training_sample_100k \
+  --seed 20260810
+```
+
+输出目录包括：
+
+```text
+training_sample_100k/
+├── recipe_train_sample_100000.jsonl
+└── sample_report.json
+```
+
+采样器先统计非空记录，再通过第二次顺序扫描进行无偏随机选择，可以精确输出指定
+数量，不会把完整数据或 10 万条样本缓存到内存。相同源文件、数量和随机种子会得到
+相同结果。样本在输出中保留其原始相对顺序，正式训练时仍建议启用训练框架的数据
+打乱功能。若目标文件已存在，需更换输出目录或显式增加 `--overwrite`。
 
 ## 当前质量规则
 
