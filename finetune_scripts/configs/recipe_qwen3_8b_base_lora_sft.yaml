@@ -3,8 +3,8 @@ model_name_or_path: Qwen/Qwen3-8B-Base
 trust_remote_code: true
 # train.sh 会在 H100 服务器上自动优先覆盖为 fa2；未安装 flash-attn 时使用 sdpa。
 flash_attn: auto
-# H100 90GB 训练 8B LoRA 时默认关闭梯度检查点，以换取更高吞吐。
-disable_gradient_checkpointing: true
+# 实测 batch 4 遇到接近 2048 tokens 的长样本时会在交叉熵阶段触发 OOM，默认开启。
+disable_gradient_checkpointing: false
 
 ### method
 stage: sft
@@ -45,7 +45,7 @@ report_to: none
 
 ### train
 per_device_train_batch_size: 4
-per_device_eval_batch_size: 8
+per_device_eval_batch_size: 4
 gradient_accumulation_steps: 4
 learning_rate: 1.0e-5
 num_train_epochs: 3.0

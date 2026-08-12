@@ -364,9 +364,15 @@ python3 -m recipe_pipeline recipe_corpus.json \
 ```bash
 conda activate llamafactory
 bash finetune_scripts/download_model.sh
-DRY_RUN=1 bash finetune_scripts/train.sh
-bash finetune_scripts/train.sh
+GPU_IDS=0 DRY_RUN=1 bash finetune_scripts/train.sh
+GPU_IDS=0 bash finetune_scripts/train.sh
 ```
 
 正式训练会自动转入后台并显示 PID 和日志路径，关闭终端不会中断；状态查看、断点恢复和
 最终评估命令见上面的微调命令手册。
+
+一条命令查看进度并自动诊断训练错误：
+
+```bash
+python3 finetune_scripts/check_training_status.py
+```

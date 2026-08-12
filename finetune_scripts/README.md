@@ -16,6 +16,7 @@ finetune_scripts/
 │   └── recipe_eval_holdout.jsonl
 ├── .gitignore
 ├── COMMANDS.md
+├── check_training_status.py
 ├── download_model.sh
 ├── evaluate_checkpoints.sh
 ├── export_best_model.sh
@@ -52,7 +53,7 @@ finetune_scripts/
 | 单卡训练 batch size | 4                                                 |
 | 梯度累积            | 4                                                 |
 | 单卡有效 batch size | 16                                                |
-| 单卡验证 batch size | 8                                                 |
+| 单卡验证 batch size | 4                                                 |
 | 计算精度            | BF16                                              |
 | 基础学习率          | `1e-5`                                            |
 | 学习率调度          | cosine                                            |
@@ -61,7 +62,7 @@ finetune_scripts/
 | Warmup steps        | 1000                                              |
 | Checkpoint 保留数量 | 不限制，保留全部                                  |
 | 评估频率            | 1400 steps                                        |
-| 梯度检查点          | 默认关闭，可在 OOM 时启用                         |
+| 梯度检查点          | 默认开启，给长序列 loss 峰值预留显存             |
 | Prompt loss         | 关闭，只对 output 计算损失                        |
 | Packing             | 关闭                                              |
 | 随机种子            | 42                                                |
@@ -114,15 +115,24 @@ LlamaFactory 参数文档的常用设置。训练最多读取 100000 条样本�
 确定最终版本后再人工删除效果较差的节点。所有 checkpoint 都包含继续训练需要的状态，
 可以直接通过 `RESUME_FROM_CHECKPOINT` 恢复。
 
-H100 90GB 上默认关闭梯度检查点，以减少重算并提高吞吐。如实测发生 OOM，可直接启用：
+实测 H100 约 95GiB 可用显存时，batch 4 在第 222 步遇到接近 2048 tokens 的长样本，
+交叉熵计算需要额外约 4.64GiB，而当时只剩约 4.55GiB，关闭梯度检查点会 OOM。因此正式
+配置改为默认开启梯度检查点，并将验证 batch 从 8 调为 4。训练 batch 仍为 4、梯度累积
+仍为 4，有效 batch size 不变。
+
+如果启用梯度检查点后仍然 OOM，可通过环境变量降低 micro-batch，同时保持有效 batch：
 
 ```bash
-GRADIENT_CHECKPOINTING=1 bash finetune_scripts/train.sh
+TRAIN_BATCH_SIZE=2 \
+EVAL_BATCH_SIZE=2 \
+GRADIENT_ACCUMULATION_STEPS=8 \
+GPU_IDS=0 \
+bash finetune_scripts/train.sh
 ```
 
-若仍然 OOM，再把单卡 batch size 从 4 降为 2、梯度累积从 4 提高为 8，以保持有效
-batch size 16。YAML 使用 LlamaFactory 当前参数 `disable_gradient_checkpointing`，
-`train.sh` 用更易理解的 `GRADIENT_CHECKPOINTING=0/1` 对其反向转换。
+YAML 使用 LlamaFactory 当前参数 `disable_gradient_checkpointing`，`train.sh` 用更易理解的
+`GRADIENT_CHECKPOINTING=0/1` 对其反向转换。不建议再次关闭；如需性能对照，可显式设置
+`GRADIENT_CHECKPOINTING=0`，但长样本仍可能复现 OOM。
 
 ## DoRA 的作用和当前取舍
 
@@ -138,7 +148,7 @@ alpha 64、`lora_target: all` 和 LoRA+ 已经有足够容量；同时 vLLM 当�
 如需验证 DoRA 是否真的改善食谱任务，可只做一个严格对照实验，其他参数和随机种子不变：
 
 ```bash
-USE_DORA=1 OUTPUT_DIR=/data/checkpoints/recipe-dora-sft \
+GPU_IDS=0 USE_DORA=1 OUTPUT_DIR=/data/checkpoints/recipe-dora-sft \
 bash finetune_scripts/train.sh
 ```
 
@@ -150,8 +160,8 @@ bash finetune_scripts/train.sh
 `flash_attn=fa2`，否则传入 `flash_attn=sdpa`。也可以显式指定：
 
 ```bash
-ATTENTION_BACKEND=fa2 bash finetune_scripts/train.sh
-ATTENTION_BACKEND=sdpa bash finetune_scripts/train.sh
+GPU_IDS=0 ATTENTION_BACKEND=fa2 bash finetune_scripts/train.sh
+GPU_IDS=0 ATTENTION_BACKEND=sdpa bash finetune_scripts/train.sh
 ```
 
 指定 `fa2` 但环境无法导入 FlashAttention 时，脚本会在训练前停止。启动时还会输出
@@ -206,6 +216,7 @@ bash finetune_scripts/download_model.sh
 
 ```bash
 MODEL_PATH=/data/models/Qwen3-8B-Base \
+GPU_IDS=0 \
 bash finetune_scripts/train.sh
 ```
 
@@ -233,30 +244,42 @@ bash finetune_scripts/download_model.sh
 先进行 dry-run，只检查目录、数据和最终命令，不启动训练：
 
 ```bash
-DRY_RUN=1 bash finetune_scripts/train.sh
+GPU_IDS=0 DRY_RUN=1 bash finetune_scripts/train.sh
 ```
 
 确认输出正确后正式训练：
 
 ```bash
-bash finetune_scripts/train.sh
+GPU_IDS=0 bash finetune_scripts/train.sh
 ```
 
 正式训练默认通过 `nohup` 自动转入后台，服务器存在 `setsid` 时还会脱离当前会话；命令
-返回后会显示 PID 和时间戳日志路径，可以直接关闭终端，不需要手工追加 `&`。查看状态：
+返回后会显示 PID 和时间戳日志路径，可以直接关闭终端，不需要手工追加 `&`。
+
+如果没有设置 `RESUME_FROM_CHECKPOINT`，并且 `OUTPUT_DIR` 已有内容，脚本不会直接覆盖，
+而是显示要删除的绝对路径；只有输入完整的小写 `yes` 才会清空旧内容并从头训练，其他
+输入都会取消。使用断点恢复时不会清空目录。
+
+查看状态和自动错误诊断只需一条命令，不需要逐行阅读日志：
 
 ```bash
-RECIPE_TRAIN_PID=$(cat finetune_scripts/logs/train.pid)
-ps -p "$RECIPE_TRAIN_PID" -o pid,etime,stat,cmd
-
-RECIPE_TRAIN_LOG=$(ls -1t finetune_scripts/logs/train_*.log | head -n 1)
-tail -f "$RECIPE_TRAIN_LOG"
+python3 finetune_scripts/check_training_status.py
 ```
+
+需要持续观察时自动每 30 秒刷新，无需滚动日志：
+
+```bash
+watch -n 30 python3 finetune_scripts/check_training_status.py
+```
+
+它会输出运行状态、退出码、最后训练步数、最近 loss、checkpoint 数量和自动错误分类；
+当前可识别 CUDA OOM、磁盘不足、NCCL、NaN、系统强杀、JSON/数据异常和普通 traceback。
+需要接入监控系统时使用 `--json` 获取机器可读结果。
 
 `DRY_RUN=1` 始终在前台显示检查结果。需要在前台调试正式训练时使用：
 
 ```bash
-TRAIN_RUN_MODE=foreground bash finetune_scripts/train.sh
+GPU_IDS=0 TRAIN_RUN_MODE=foreground bash finetune_scripts/train.sh
 ```
 
 普通 SSH 服务器可使用上述后台模式；Slurm、Kubernetes 或启用了登录退出进程清理策略的
@@ -274,12 +297,16 @@ finetune_scripts/outputs/qwen3-8b-base/recipe-lora-sft/
 
 ```bash
 MODEL_PATH=/data/models/Qwen3-8B-Base \
+GPU_IDS=0 \
 bash finetune_scripts/train.sh
 ```
 
 `MODEL_PATH` 不应改成其他模型架构；训练模板固定为 `qwen3_nothink`。
 
 ## 指定 GPU
+
+训练脚本不提供默认 GPU。所有训练、dry-run 和断点恢复命令都必须显式传入 `GPU_IDS`；
+遗漏时脚本会立即退出，不会创建、清空输出目录，也不会启动后台进程。
 
 使用 GPU 0：
 
@@ -308,6 +335,7 @@ training_sample/recipe_train_sample_100000.jsonl
 
 ```bash
 DATA_FILE=/data/recipe/recipe_train_sample_100000.jsonl \
+GPU_IDS=0 \
 bash finetune_scripts/train.sh
 ```
 
@@ -317,6 +345,7 @@ bash finetune_scripts/train.sh
 
 ```bash
 RESUME_FROM_CHECKPOINT=/path/to/recipe-lora-sft/checkpoint-5000 \
+GPU_IDS=0 \
 bash finetune_scripts/train.sh
 ```
 
@@ -324,6 +353,7 @@ bash finetune_scripts/train.sh
 
 ```bash
 OUTPUT_DIR=/data/checkpoints/recipe-qwen3-8b-base \
+GPU_IDS=0 \
 bash finetune_scripts/train.sh
 ```
 
@@ -337,12 +367,12 @@ command -v llamafactory-cli
 llamafactory-cli version
 nvidia-smi
 python finetune_scripts/verify_model.py "$HOME/models/Qwen3-8B-Base"
-DRY_RUN=1 bash finetune_scripts/train.sh
+GPU_IDS=0 DRY_RUN=1 bash finetune_scripts/train.sh
 ```
 
 如果仍然出现 CUDA OOM，先检查是否有其他进程占用 GPU，再把单卡 batch size 从 4
-降到 2，并把梯度累积从 4 提高到 8，从而保持有效 batch size 16。不要直接改成
-QLoRA，因为当前 H100 90GB 和最终方案都适合 BF16 LoRA。
+降到 2，并把梯度累积从 4 提高到 8，从而保持有效 batch size 16；可直接使用上面的环境
+变量命令，无需修改 YAML。不要直接改成 QLoRA，因为当前 H100 和最终方案适合 BF16 LoRA。
 
 ## 最终评估方案
 

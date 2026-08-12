@@ -101,13 +101,13 @@ finetune_scripts/data/eval_holdout_report.json
 先执行 dry-run，检查路径、模型、数据、GPU 和最终 LlamaFactory 命令：
 
 ```bash
-DRY_RUN=1 bash finetune_scripts/train.sh
+GPU_IDS=0 DRY_RUN=1 bash finetune_scripts/train.sh
 ```
 
 确认无误后启动正式训练：
 
 ```bash
-bash finetune_scripts/train.sh
+GPU_IDS=0 bash finetune_scripts/train.sh
 ```
 
 正式训练默认自动转入后台，命令会立即返回并显示 PID、PID 文件和日志文件。脚本使用
@@ -118,10 +118,19 @@ bash finetune_scripts/train.sh
 管理员启用了退出登录后清理用户进程的策略，应改用平台提供的作业提交命令；Shell 脚本
 无法绕过服务器级进程清理策略。
 
+如果默认输出目录已经存在训练文件，脚本会显示明确警告：
+
+```text
+输入 yes 将永久清空目录内容并从头训练，其他输入均取消：
+```
+
+只有输入完整的小写 `yes` 才会清空旧目录并继续。设置 `RESUME_FROM_CHECKPOINT` 时属于
+断点恢复，不执行清空操作。`DRY_RUN=1` 只提示将发生清空确认，不删除文件。
+
 需要在前台调试时：
 
 ```bash
-TRAIN_RUN_MODE=foreground bash finetune_scripts/train.sh
+GPU_IDS=0 TRAIN_RUN_MODE=foreground bash finetune_scripts/train.sh
 ```
 
 默认训练参数：
@@ -144,6 +153,7 @@ BF16：开启
 截断长度：2048
 logging / eval / save / warmup steps：100 / 1400 / 1400 / 1000
 checkpoint：全部保留
+梯度检查点：开启
 ```
 
 指定其他模型、数据和 checkpoint 输出目录：
@@ -152,10 +162,11 @@ checkpoint：全部保留
 MODEL_PATH=/data/models/Qwen3-8B-Base \
 DATA_FILE=/data/recipe/recipe_train_sample_100000.jsonl \
 OUTPUT_DIR=/data/checkpoints/recipe-lora-sft \
+GPU_IDS=0 \
 bash finetune_scripts/train.sh
 ```
 
-指定 GPU：
+GPU 没有默认值，每次训练和 dry-run 都必须显式指定。使用 GPU 0：
 
 ```bash
 GPU_IDS=0 bash finetune_scripts/train.sh
@@ -164,16 +175,21 @@ GPU_IDS=0 bash finetune_scripts/train.sh
 显式指定 Attention 后端：
 
 ```bash
-ATTENTION_BACKEND=fa2 bash finetune_scripts/train.sh
-ATTENTION_BACKEND=sdpa bash finetune_scripts/train.sh
+GPU_IDS=0 ATTENTION_BACKEND=fa2 bash finetune_scripts/train.sh
+GPU_IDS=0 ATTENTION_BACKEND=sdpa bash finetune_scripts/train.sh
 ```
 
 默认自动检测 FlashAttention-2；环境不支持时回退到 PyTorch SDPA。
 
-H100 90GB 默认关闭梯度检查点以提高吞吐。出现 CUDA OOM 时先启用梯度检查点：
+实测关闭梯度检查点时，batch 4 的长序列在交叉熵计算阶段会耗尽约 95GiB 显存，因此
+当前默认开启梯度检查点，验证 batch 也已从 8 调为 4。若仍然 OOM：
 
 ```bash
-GRADIENT_CHECKPOINTING=1 bash finetune_scripts/train.sh
+TRAIN_BATCH_SIZE=2 \
+EVAL_BATCH_SIZE=2 \
+GRADIENT_ACCUMULATION_STEPS=8 \
+GPU_IDS=0 \
+bash finetune_scripts/train.sh
 ```
 
 DoRA 默认关闭。如需进行独立对照实验，必须使用不同输出目录：
@@ -181,29 +197,40 @@ DoRA 默认关闭。如需进行独立对照实验，必须使用不同输出目
 ```bash
 USE_DORA=1 \
 OUTPUT_DIR=/data/checkpoints/recipe-dora-sft \
+GPU_IDS=0 \
 bash finetune_scripts/train.sh
 ```
 
 ## 5. 查看训练状态
 
-查看后台训练 PID 和进程状态：
+日常排查只执行这一条命令：
 
 ```bash
-cat finetune_scripts/logs/train.pid
-
-RECIPE_TRAIN_PID=$(cat finetune_scripts/logs/train.pid)
-ps -p "$RECIPE_TRAIN_PID" -o pid,etime,stat,cmd
+python3 finetune_scripts/check_training_status.py
 ```
 
-查看最近一次后台训练日志：
+每 30 秒自动刷新状态：
 
 ```bash
-RECIPE_TRAIN_LOG=$(ls -1t finetune_scripts/logs/train_*.log | head -n 1)
-tail -f "$RECIPE_TRAIN_LOG"
+watch -n 30 python3 finetune_scripts/check_training_status.py
 ```
 
-日志中的配置检查通过并开始输出训练 loss 后，即可安全关闭当前终端。PID 文件在训练
-结束后可能继续保留；下次启动会检查对应进程是否仍存在，并覆盖已经失效的 PID。
+命令会直接汇总：
+
+- `运行中`、`已正常完成`、`异常退出`或`进程已消失`；
+- PID、退出码和开始/结束时间；
+- 最后训练步数、最近 loss 和学习率；
+- checkpoint 数量与最近 checkpoint；
+- CUDA OOM、磁盘不足、NCCL、NaN、系统强杀、数据异常或 Python 异常；
+- 针对已识别错误的处理建议。
+
+输出机器可读 JSON，便于接入 cron、Webhook 或其他监控：
+
+```bash
+python3 finetune_scripts/check_training_status.py --json
+```
+
+返回码为 `0` 表示运行中或正常完成，`2` 表示失败或进程异常消失，`3` 表示尚无状态。
 
 查看 GPU 使用情况：
 
@@ -218,10 +245,11 @@ find finetune_scripts/outputs/qwen3-8b-base/recipe-lora-sft \
   -mindepth 1 -maxdepth 1 -type d -name 'checkpoint-*' | sort -V
 ```
 
-如果训练日志文件已经生成，可持续查看：
+只有自动诊断信息不足时，才查看日志最后 80 行：
 
 ```bash
-tail -f finetune_scripts/outputs/qwen3-8b-base/recipe-lora-sft/trainer_log.jsonl
+RECIPE_TRAIN_LOG=$(ls -1t finetune_scripts/logs/train_*.log | head -n 1)
+tail -n 80 "$RECIPE_TRAIN_LOG"
 ```
 
 需要主动停止训练时，向后台主进程发送 TERM：
@@ -239,6 +267,7 @@ kill "$RECIPE_TRAIN_PID"
 
 ```bash
 RESUME_FROM_CHECKPOINT=finetune_scripts/outputs/qwen3-8b-base/recipe-lora-sft/checkpoint-5000 \
+GPU_IDS=0 \
 bash finetune_scripts/train.sh
 ```
 
@@ -247,6 +276,7 @@ bash finetune_scripts/train.sh
 ```bash
 OUTPUT_DIR=/data/checkpoints/recipe-lora-sft \
 RESUME_FROM_CHECKPOINT=/data/checkpoints/recipe-lora-sft/checkpoint-5000 \
+GPU_IDS=0 \
 bash finetune_scripts/train.sh
 ```
 
@@ -256,6 +286,7 @@ DoRA checkpoint 续训时必须继续设置 `USE_DORA=1`：
 USE_DORA=1 \
 OUTPUT_DIR=/data/checkpoints/recipe-dora-sft \
 RESUME_FROM_CHECKPOINT=/data/checkpoints/recipe-dora-sft/checkpoint-5000 \
+GPU_IDS=0 \
 bash finetune_scripts/train.sh
 ```
 
@@ -392,8 +423,8 @@ cd "$PROJECT_DIR"
 conda activate llamafactory
 
 bash finetune_scripts/download_model.sh
-DRY_RUN=1 bash finetune_scripts/train.sh
-bash finetune_scripts/train.sh
+GPU_IDS=0 DRY_RUN=1 bash finetune_scripts/train.sh
+GPU_IDS=0 bash finetune_scripts/train.sh
 
 conda activate llamafactory-eval
 DRY_RUN=1 bash finetune_scripts/evaluate_checkpoints.sh
@@ -413,15 +444,19 @@ bash finetune_scripts/export_best_model.sh
 | `MODEL_PATH`             | `$HOME/models/Qwen3-8B-Base`                       | 训练、评估或合并使用的基础模型 |
 | `DATA_FILE`              | `training_sample/recipe_train_sample_100000.jsonl` | 训练数据                       |
 | `OUTPUT_DIR`             | `finetune_scripts/outputs/.../recipe-lora-sft`     | 训练和 checkpoint 输出目录     |
-| `GPU_IDS`                | `0`                                                | 使用的 CUDA 设备               |
+| `GPU_IDS`                | 无，必须显式指定                                   | 使用的 CUDA 设备               |
 | `ATTENTION_BACKEND`      | `auto`                                             | `fa2`、`sdpa` 或 `disabled`    |
-| `GRADIENT_CHECKPOINTING` | `0`                                                | 是否启用梯度检查点             |
+| `GRADIENT_CHECKPOINTING` | `1`                                                | 是否启用梯度检查点             |
+| `TRAIN_BATCH_SIZE`       | `4`                                                | 单卡训练 micro-batch           |
+| `EVAL_BATCH_SIZE`        | `4`                                                | 单卡验证 batch                 |
+| `GRADIENT_ACCUMULATION_STEPS` | `4`                                           | 梯度累积步数                   |
 | `USE_DORA`               | `0`                                                | 是否启用实验性 DoRA            |
 | `RESUME_FROM_CHECKPOINT` | 空                                                 | 断点恢复目录                   |
 | `TRAIN_RUN_MODE`         | `background`                                       | 后台运行或前台调试             |
 | `TRAIN_LOG_DIR`          | `finetune_scripts/logs`                            | 后台训练日志目录               |
 | `TRAIN_LOG_FILE`         | 自动生成时间戳文件名                               | 自定义本次后台日志文件         |
 | `TRAIN_PID_FILE`         | `finetune_scripts/logs/train.pid`                  | 后台训练 PID 文件              |
+| `TRAIN_STATUS_FILE`      | `finetune_scripts/logs/train_status.json`          | 状态、退出码和路径记录         |
 | `CHECKPOINT_ROOT`        | 默认训练输出目录                                   | 批量评估的 checkpoint 根目录   |
 | `CHECKPOINT_DIR`         | 空                                                 | 只评估一个 checkpoint          |
 | `RESULT_ROOT`            | `finetune_scripts/evaluation/...`                  | 评估结果目录                   |
