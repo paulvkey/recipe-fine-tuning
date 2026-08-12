@@ -140,9 +140,9 @@ printf '单卡有效 batch size：16\n'
 printf '验证 batch size：8\n'
 printf '截断长度：2048\n'
 printf '日志间隔：100 steps\n'
-printf '保存间隔：1400 steps（约 1/4 epoch，保留全部 checkpoint）\n'
+printf '保存间隔：1400 steps\n'
 printf 'Warmup：1000 steps\n'
-printf '评估频率：1400 steps（约 1/4 epoch，与保存对齐）\n'
+printf '评估频率：1400 steps\n'
 printf '输出目录：%s\n' "$OUTPUT_DIR"
 if [[ -n "$RESUME_FROM_CHECKPOINT" ]]; then
   printf '恢复断点：%s\n' "$RESUME_FROM_CHECKPOINT"

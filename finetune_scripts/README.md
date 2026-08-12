@@ -33,39 +33,39 @@ finetune_scripts/
 
 ## 最终训练参数
 
-| 参数 | 配置值 |
-| --- | --- |
-| 基础模型 | `Qwen/Qwen3-8B-Base` |
-| 训练阶段 | SFT |
-| 对话模板 | `qwen3_nothink`（非思考模式） |
-| 微调方式 | LoRA |
-| LoRA target | `all` |
-| LoRA rank | 32 |
-| LoRA alpha | 64 |
-| LoRA dropout | 0.0 |
-| LoRA+ 学习率比例 | 16 |
-| DoRA | 默认关闭，可通过环境变量启用 |
-| 最大样本数 | 100000 |
-| 验证集比例 | 0.1 |
-| 训练轮数 | 3 |
-| 截断长度 | 2048 tokens |
-| 单卡训练 batch size | 4 |
-| 梯度累积 | 4 |
-| 单卡有效 batch size | 16 |
-| 单卡验证 batch size | 8 |
-| 计算精度 | BF16 |
-| 基础学习率 | `1e-5` |
-| 学习率调度 | cosine |
-| Logging steps | 100 |
-| Save steps | 1400（约 1/4 epoch） |
-| Warmup steps | 1000 |
-| Checkpoint 保留数量 | 不限制，保留全部 |
-| 评估频率 | 1400 steps（约 1/4 epoch，与保存对齐） |
-| 梯度检查点 | 默认关闭，可在 OOM 时启用 |
-| Prompt loss | 关闭，只对 output 计算损失 |
-| Packing | 关闭 |
-| 随机种子 | 42 |
-| Attention | H100 优先 FlashAttention-2，未安装时自动回退 SDPA |
+| 参数                | 配置值                                            |
+| ------------------- | ------------------------------------------------- |
+| 基础模型            | `Qwen/Qwen3-8B-Base`                              |
+| 训练阶段            | SFT                                               |
+| 对话模板            | `qwen3_nothink`（非思考模式）                     |
+| 微调方式            | LoRA                                              |
+| LoRA target         | `all`                                             |
+| LoRA rank           | 32                                                |
+| LoRA alpha          | 64                                                |
+| LoRA dropout        | 0.0                                               |
+| LoRA+ 学习率比例    | 16                                                |
+| DoRA                | 默认关闭，可通过环境变量启用                      |
+| 最大样本数          | 100000                                            |
+| 验证集比例          | 0.1                                               |
+| 训练轮数            | 3                                                 |
+| 截断长度            | 2048 tokens                                       |
+| 单卡训练 batch size | 4                                                 |
+| 梯度累积            | 4                                                 |
+| 单卡有效 batch size | 16                                                |
+| 单卡验证 batch size | 8                                                 |
+| 计算精度            | BF16                                              |
+| 基础学习率          | `1e-5`                                            |
+| 学习率调度          | cosine                                            |
+| Logging steps       | 100                                               |
+| Save steps          | 1400（约 1/4 epoch）                              |
+| Warmup steps        | 1000                                              |
+| Checkpoint 保留数量 | 不限制，保留全部                                  |
+| 评估频率            | 1400 steps                                        |
+| 梯度检查点          | 默认关闭，可在 OOM 时启用                         |
+| Prompt loss         | 关闭，只对 output 计算损失                        |
+| Packing             | 关闭                                              |
+| 随机种子            | 42                                                |
+| Attention           | H100 优先 FlashAttention-2，未安装时自动回退 SDPA |
 
 LoRA+ 的比例表示 LoRA B 矩阵学习率与 A 矩阵学习率的比例。当前 A 矩阵学习率为
 `1e-5`，B 矩阵学习率为 `1.6e-4`。`lora_alpha: 64` 是 rank 32 的 2 倍，符合
@@ -90,12 +90,12 @@ LlamaFactory 参数文档的常用设置。训练最多读取 100000 条样本�
 当前训练文件的字符长度统计如下：
 
 | 分位点 | instruction + input + output 字符数 |
-| --- | ---: |
-| P50 | 320 |
-| P90 | 672 |
-| P95 | 841 |
-| P99 | 1323 |
-| P99.9 | 2272 |
+| ------ | ----------------------------------: |
+| P50    |                                 320 |
+| P90    |                                 672 |
+| P95    |                                 841 |
+| P99    |                                1323 |
+| P99.9  |                                2272 |
 
 只有 0.15% 的记录超过 2048 个字符。字符数不完全等于 token 数，但说明 2048 的截断
 长度总体合理。下载模型后如需精确判断，可以用 Qwen3 tokenizer 对全部数据再次统计。
